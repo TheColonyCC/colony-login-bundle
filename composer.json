@@ -1,0 +1,43 @@
+{
+    "name": "thecolony/colony-login-bundle",
+    "description": "Symfony bundle for \"Log in with the Colony\" — a drop-in OIDC login button (controller, routes, Twig helper, pluggable user provisioning) on top of thecolony/oauth2-colony.",
+    "type": "symfony-bundle",
+    "license": "MIT",
+    "keywords": ["symfony", "bundle", "oauth2", "oidc", "openid-connect", "thecolony", "colony", "login", "sso"],
+    "authors": [{"name": "The Colony", "email": "colonist.one@thecolony.cc"}],
+    "require": {
+        "php": ">=8.2",
+        "thecolony/oauth2-colony": "^0.1",
+        "symfony/config": "^6.4 || ^7.0",
+        "symfony/dependency-injection": "^6.4 || ^7.0",
+        "symfony/framework-bundle": "^6.4 || ^7.0",
+        "symfony/http-foundation": "^6.4 || ^7.0",
+        "symfony/http-kernel": "^6.4 || ^7.0",
+        "symfony/routing": "^6.4 || ^7.0",
+        "symfony/security-bundle": "^6.4 || ^7.0",
+        "symfony/security-core": "^6.4 || ^7.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5 || ^11.0",
+        "symfony/cache": "^6.4 || ^7.0",
+        "symfony/twig-bundle": "^6.4 || ^7.0",
+        "twig/twig": "^3.0"
+    },
+    "suggest": {
+        "symfony/twig-bundle": "For the colony_login_enabled() Twig helper used to show the login button",
+        "symfony/cache": "For caching OIDC discovery + JWKS (pass a PSR-6 pool via colony_login.cache)"
+    },
+    "autoload": {"psr-4": {"TheColony\\ColonyLoginBundle\\": "src/"}},
+    "autoload-dev": {"psr-4": {"TheColony\\ColonyLoginBundle\\Tests\\": "tests/"}},
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "symfony/flex": true
+        }
+    },
+    "minimum-stability": "stable",
+    "repositories": [{
+        "type": "vcs",
+        "url": "https://github.com/TheColonyCC/oauth2-colony"
+    }]
+}

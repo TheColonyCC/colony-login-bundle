@@ -1,0 +1,121 @@
+<?php
+
+declare(strict_types=1);
+
+namespace TheColony\ColonyLoginBundle\Tests;
+
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\TestCase;
+use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Reference;
+use TheColony\ColonyLoginBundle\ColonyLoginBundle;
+use TheColony\ColonyLoginBundle\Controller\ColonyLoginController;
+use TheColony\ColonyLoginBundle\Security\ColonyUserProvisionerInterface;
+use TheColony\OAuth2\ColonyProvider;
+
+final class BundleExtensionTest extends TestCase
+{
+    /** @param array<string,mixed> $config */
+    private function load(array $config): ContainerBuilder
+    {
+        $container = new ContainerBuilder();
+        $container->setParameter('kernel.environment', 'test');
+        $container->setParameter('kernel.debug', true);
+        $container->setParameter('kernel.build_dir', sys_get_temp_dir());
+        $container->setParameter('kernel.project_dir', sys_get_temp_dir());
+        $extension = (new ColonyLoginBundle())->getContainerExtension();
+        self::assertNotNull($extension);
+        $extension->load([$config], $container);
+
+        return $container;
+    }
+
+    #[Test]
+    public function it_registers_the_core_services_with_defaults(): void
+    {
+        $c = $this->load(['provisioner' => 'app.provisioner']);
+
+        self::assertTrue($c->hasDefinition('colony_login.provider'));
+        self::assertTrue($c->hasDefinition('colony_login.state'));
+        self::assertTrue($c->hasDefinition('colony_login.controller'));
+        self::assertTrue($c->hasDefinition('colony_login.twig_extension'));
+
+        $provider = $c->getDefinition('colony_login.provider');
+        self::assertSame(ColonyProvider::class, $provider->getClass());
+        $options = $provider->getArgument(0);
+        self::assertSame('https://thecolony.cc', $options['issuer']);
+        self::assertSame('openid profile email', $options['scope']);
+        self::assertArrayNotHasKey('cache', $options, 'no cache option when none configured');
+
+        // provisioner alias points at the app service
+        $alias = $c->getAlias(ColonyUserProvisionerInterface::class);
+        self::assertSame('app.provisioner', (string) $alias);
+    }
+
+    #[Test]
+    public function controller_is_public_and_wired(): void
+    {
+        $c = $this->load(['provisioner' => 'app.provisioner']);
+        $def = $c->getDefinition('colony_login.controller');
+        self::assertSame(ColonyLoginController::class, $def->getClass());
+        self::assertTrue($def->isPublic());
+
+        $args = $def->getArguments();
+        self::assertEquals(new Reference('colony_login.provider'), $args[0]);
+        self::assertEquals(new Reference(ColonyUserProvisionerInterface::class), $args[1]);
+        self::assertEquals(new Reference('security.helper'), $args[3]);
+        self::assertSame('app_dashboard', $args[4]); // default success route
+        self::assertSame('app_login', $args[5]);     // default failure route
+    }
+
+    #[Test]
+    public function cache_option_wires_a_psr16_wrapper(): void
+    {
+        $c = $this->load(['provisioner' => 'app.provisioner', 'cache' => 'cache.app']);
+        self::assertTrue($c->hasDefinition('colony_login.psr16_cache'));
+        $wrapper = $c->getDefinition('colony_login.psr16_cache');
+        self::assertEquals(new Reference('cache.app'), $wrapper->getArgument(0));
+
+        $options = $c->getDefinition('colony_login.provider')->getArgument(0);
+        self::assertEquals(new Reference('colony_login.psr16_cache'), $options['cache']);
+    }
+
+    #[Test]
+    public function custom_routes_and_authenticator_flow_through(): void
+    {
+        $c = $this->load([
+            'provisioner' => 'app.provisioner',
+            'authenticator' => 'form_login',
+            'default_uri' => 'https://app.example',
+            'routes' => ['success' => 'home', 'failure' => 'signin'],
+        ]);
+        $args = $c->getDefinition('colony_login.controller')->getArguments();
+        self::assertSame('home', $args[4]);
+        self::assertSame('signin', $args[5]);
+        self::assertSame('form_login', $args[6]);
+        self::assertSame('https://app.example', $args[7]);
+    }
+
+    #[Test]
+    public function client_credentials_flow_to_state_and_provider(): void
+    {
+        $c = $this->load([
+            'provisioner' => 'app.provisioner',
+            'client_id' => 'cid',
+            'client_secret' => 'csecret',
+            'scope' => 'openid',
+        ]);
+        self::assertSame(['cid', 'csecret'], $c->getDefinition('colony_login.state')->getArguments());
+        $options = $c->getDefinition('colony_login.provider')->getArgument(0);
+        self::assertSame('cid', $options['clientId']);
+        self::assertSame('openid', $options['scope']);
+    }
+
+    #[Test]
+    public function provisioner_is_required(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->load([]);
+    }
+}
