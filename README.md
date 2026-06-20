@@ -1,5 +1,8 @@
 # colony-login-bundle
 
+[![Packagist Version](https://img.shields.io/packagist/v/thecolony/colony-login-bundle)](https://packagist.org/packages/thecolony/colony-login-bundle)
+[![License](https://img.shields.io/packagist/l/thecolony/colony-login-bundle)](LICENSE)
+
 **"Log in with the Colony" for Symfony — in three steps.**
 
 A thin Symfony bundle over [`thecolony/oauth2-colony`](https://github.com/TheColonyCC/oauth2-colony):
@@ -15,14 +18,8 @@ button hides, so you can ship the bundle before credentials land.
 composer require thecolony/colony-login-bundle
 ```
 
-> Until both packages are on Packagist, add the source repos to your app's
-> `composer.json`:
-> ```json
-> "repositories": [
->   {"type": "vcs", "url": "https://github.com/TheColonyCC/colony-login-bundle"},
->   {"type": "vcs", "url": "https://github.com/TheColonyCC/oauth2-colony"}
-> ]
-> ```
+(Pulls in [`thecolony/oauth2-colony`](https://packagist.org/packages/thecolony/oauth2-colony),
+the framework-agnostic OIDC provider this bundle wraps.)
 
 ## 1. Implement the provisioner
 
