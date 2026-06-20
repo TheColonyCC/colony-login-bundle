@@ -58,7 +58,11 @@ final class ColonyLoginBundle extends AbstractBundle
      */
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
-        $services = $container->services()->defaults()->autoconfigure();
+        $services = $container->services();
+        // autoconfigure so the AbstractController controller gets its service-subscriber
+        // container (setContainer) + controller.service_arguments tag, and the Twig
+        // extension gets the twig.extension tag.
+        $services->defaults()->autoconfigure();
 
         $services->set('colony_login.state', ColonyLoginState::class)
             ->args([$config['client_id'], $config['client_secret']])
@@ -80,9 +84,6 @@ final class ColonyLoginBundle extends AbstractBundle
             ->args([$providerOptions, []])
             ->public(); // so apps can reach it directly (e.g. verifyIdToken) and tests can swap it
 
-        // The app's provisioner, exposed under the interface the controller needs.
-        $container->services()->alias(ColonyUserProvisionerInterface::class, $config['provisioner']);
-
         // Registered under its FQCN so Symfony's controller resolver finds it by
         // the class name used in the route attributes.
         $services->set(ColonyLoginController::class)
@@ -100,5 +101,8 @@ final class ColonyLoginBundle extends AbstractBundle
 
         $services->set('colony_login.twig_extension', ColonyLoginExtension::class)
             ->args([service('colony_login.state')]);
+
+        // The app's provisioner, exposed under the interface the controller needs.
+        $services->alias(ColonyUserProvisionerInterface::class, $config['provisioner']);
     }
 }

@@ -61,6 +61,14 @@ final class BundleExtensionTest extends TestCase
         $def = $c->getDefinition(ColonyLoginController::class);
         // service id == FQCN, so the class is inferred from the id (getClass() is null)
         self::assertTrue($def->isPublic());
+        // MUST be autoconfigured so AbstractController gets its setContainer call +
+        // controller.service_arguments tag — without this the route resolver throws
+        // "controller has no container set".
+        self::assertTrue($def->isAutoconfigured(), 'controller must be autoconfigured');
+        self::assertTrue(
+            $c->getDefinition('colony_login.twig_extension')->isAutoconfigured(),
+            'twig extension must be autoconfigured for the twig.extension tag',
+        );
 
         $args = $def->getArguments();
         self::assertEquals(new Reference('colony_login.provider'), $args[0]);
