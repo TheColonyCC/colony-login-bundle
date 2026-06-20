@@ -59,11 +59,12 @@ final class BundleExtensionTest extends TestCase
     {
         $c = $this->load(['provisioner' => 'app.provisioner']);
         $def = $c->getDefinition(ColonyLoginController::class);
-        // service id == FQCN, so the class is inferred from the id (getClass() is null)
         self::assertTrue($def->isPublic());
-        // MUST be autoconfigured so AbstractController gets its setContainer call +
-        // controller.service_arguments tag — without this the route resolver throws
-        // "controller has no container set".
+        self::assertSame(ColonyLoginController::class, $def->getClass(), 'explicit class so passes can reflect it');
+        // MUST be autowired + autoconfigured so AutowireRequiredMethodsPass injects the
+        // AbstractController service-subscriber container via #[Required] setContainer();
+        // otherwise the route resolver throws "controller has no container set".
+        self::assertTrue($def->isAutowired(), 'controller must be autowired for setContainer injection');
         self::assertTrue($def->isAutoconfigured(), 'controller must be autoconfigured');
         self::assertTrue(
             $c->getDefinition('colony_login.twig_extension')->isAutoconfigured(),

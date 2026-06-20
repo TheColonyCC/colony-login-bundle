@@ -85,8 +85,11 @@ final class ColonyLoginBundle extends AbstractBundle
             ->public(); // so apps can reach it directly (e.g. verifyIdToken) and tests can swap it
 
         // Registered under its FQCN so Symfony's controller resolver finds it by
-        // the class name used in the route attributes.
-        $services->set(ColonyLoginController::class)
+        // the class name used in the route attributes. Must be autowired with an
+        // explicit class so AutowireRequiredMethodsPass injects the AbstractController
+        // service-subscriber container via its #[Required] setContainer().
+        $services->set(ColonyLoginController::class, ColonyLoginController::class)
+            ->autowire()
             ->public()
             ->args([
                 service('colony_login.provider'),
