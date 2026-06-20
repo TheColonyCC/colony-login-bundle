@@ -61,7 +61,8 @@ final class ColonyLoginBundle extends AbstractBundle
         $services = $container->services()->defaults()->autoconfigure();
 
         $services->set('colony_login.state', ColonyLoginState::class)
-            ->args([$config['client_id'], $config['client_secret']]);
+            ->args([$config['client_id'], $config['client_secret']])
+            ->public(); // readable by apps; swappable in tests
 
         $providerOptions = [
             'clientId' => $config['client_id'],
@@ -82,7 +83,9 @@ final class ColonyLoginBundle extends AbstractBundle
         // The app's provisioner, exposed under the interface the controller needs.
         $container->services()->alias(ColonyUserProvisionerInterface::class, $config['provisioner']);
 
-        $services->set('colony_login.controller', ColonyLoginController::class)
+        // Registered under its FQCN so Symfony's controller resolver finds it by
+        // the class name used in the route attributes.
+        $services->set(ColonyLoginController::class)
             ->public()
             ->args([
                 service('colony_login.provider'),

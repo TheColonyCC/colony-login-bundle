@@ -38,7 +38,7 @@ final class BundleExtensionTest extends TestCase
 
         self::assertTrue($c->hasDefinition('colony_login.provider'));
         self::assertTrue($c->hasDefinition('colony_login.state'));
-        self::assertTrue($c->hasDefinition('colony_login.controller'));
+        self::assertTrue($c->hasDefinition(ColonyLoginController::class));
         self::assertTrue($c->hasDefinition('colony_login.twig_extension'));
 
         $provider = $c->getDefinition('colony_login.provider');
@@ -58,8 +58,8 @@ final class BundleExtensionTest extends TestCase
     public function controller_is_public_and_wired(): void
     {
         $c = $this->load(['provisioner' => 'app.provisioner']);
-        $def = $c->getDefinition('colony_login.controller');
-        self::assertSame(ColonyLoginController::class, $def->getClass());
+        $def = $c->getDefinition(ColonyLoginController::class);
+        // service id == FQCN, so the class is inferred from the id (getClass() is null)
         self::assertTrue($def->isPublic());
 
         $args = $def->getArguments();
@@ -91,7 +91,7 @@ final class BundleExtensionTest extends TestCase
             'default_uri' => 'https://app.example',
             'routes' => ['success' => 'home', 'failure' => 'signin'],
         ]);
-        $args = $c->getDefinition('colony_login.controller')->getArguments();
+        $args = $c->getDefinition(ColonyLoginController::class)->getArguments();
         self::assertSame('home', $args[4]);
         self::assertSame('signin', $args[5]);
         self::assertSame('form_login', $args[6]);
