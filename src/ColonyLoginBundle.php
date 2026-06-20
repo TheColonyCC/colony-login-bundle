@@ -76,7 +76,8 @@ final class ColonyLoginBundle extends AbstractBundle
         }
 
         $services->set('colony_login.provider', ColonyProvider::class)
-            ->args([$providerOptions, []]);
+            ->args([$providerOptions, []])
+            ->public(); // so apps can reach it directly (e.g. verifyIdToken) and tests can swap it
 
         // The app's provisioner, exposed under the interface the controller needs.
         $container->services()->alias(ColonyUserProvisionerInterface::class, $config['provisioner']);

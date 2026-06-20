@@ -43,6 +43,7 @@ final class BundleExtensionTest extends TestCase
 
         $provider = $c->getDefinition('colony_login.provider');
         self::assertSame(ColonyProvider::class, $provider->getClass());
+        self::assertTrue($provider->isPublic(), 'provider is public so apps/tests can reach it');
         $options = $provider->getArgument(0);
         self::assertSame('https://thecolony.cc', $options['issuer']);
         self::assertSame('openid profile email', $options['scope']);
