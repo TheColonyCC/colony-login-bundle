@@ -128,4 +128,27 @@ final class BundleExtensionTest extends TestCase
         $this->expectException(InvalidConfigurationException::class);
         $this->load([]);
     }
+
+    #[Test]
+    public function backchannel_logout_handler_is_aliased_and_passed_when_configured(): void
+    {
+        $c = $this->load([
+            'provisioner' => 'app.provisioner',
+            'backchannel_logout_handler' => 'app.logout_handler',
+        ]);
+        $alias = $c->getAlias(\TheColony\ColonyLoginBundle\Security\ColonyBackchannelLogoutHandlerInterface::class);
+        self::assertSame('app.logout_handler', (string) $alias);
+        // the controller receives the handler service as its 9th argument (index 8)
+        $args = $c->getDefinition(ColonyLoginController::class)->getArguments();
+        self::assertInstanceOf(Reference::class, $args[8]);
+    }
+
+    #[Test]
+    public function controller_gets_null_logout_handler_when_unconfigured(): void
+    {
+        $c = $this->load(['provisioner' => 'app.provisioner']);
+        self::assertFalse($c->hasAlias(\TheColony\ColonyLoginBundle\Security\ColonyBackchannelLogoutHandlerInterface::class));
+        $args = $c->getDefinition(ColonyLoginController::class)->getArguments();
+        self::assertNull($args[8]);
+    }
 }

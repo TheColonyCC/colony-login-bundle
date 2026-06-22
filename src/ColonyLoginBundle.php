@@ -10,6 +10,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 use TheColony\ColonyLoginBundle\Controller\ColonyLoginController;
+use TheColony\ColonyLoginBundle\Security\ColonyBackchannelLogoutHandlerInterface;
 use TheColony\ColonyLoginBundle\Security\ColonyLoginState;
 use TheColony\ColonyLoginBundle\Security\ColonyUserProvisionerInterface;
 use TheColony\ColonyLoginBundle\Twig\ColonyLoginExtension;
@@ -39,6 +40,7 @@ final class ColonyLoginBundle extends AbstractBundle
                 ->scalarNode('provisioner')->isRequired()->cannotBeEmpty()->info('Service id implementing ColonyUserProvisionerInterface')->end()
                 ->scalarNode('cache')->defaultValue('')->info('PSR-6 cache pool service id for discovery + JWKS (e.g. cache.app)')->end()
                 ->scalarNode('authenticator')->defaultValue('')->info('Authenticator name passed to Security::login() (e.g. form_login)')->end()
+                ->scalarNode('backchannel_logout_handler')->defaultValue('')->info('Optional service id implementing ColonyBackchannelLogoutHandlerInterface; enables POST /auth/colony/backchannel-logout')->end()
                 ->arrayNode('routes')
                     ->addDefaultsIfNotSet()
                     ->children()
@@ -53,6 +55,7 @@ final class ColonyLoginBundle extends AbstractBundle
      * @param array{
      *     client_id: string, client_secret: string, issuer: string, scope: string,
      *     default_uri: string, provisioner: string, cache: string, authenticator: string,
+     *     backchannel_logout_handler: string,
      *     routes: array{success: string, failure: string}
      * } $config
      */
@@ -100,6 +103,9 @@ final class ColonyLoginBundle extends AbstractBundle
                 $config['routes']['failure'],
                 $config['authenticator'],
                 $config['default_uri'],
+                $config['backchannel_logout_handler'] !== ''
+                    ? service(ColonyBackchannelLogoutHandlerInterface::class)
+                    : null,
             ]);
 
         $services->set('colony_login.twig_extension', ColonyLoginExtension::class)
@@ -107,5 +113,10 @@ final class ColonyLoginBundle extends AbstractBundle
 
         // The app's provisioner, exposed under the interface the controller needs.
         $services->alias(ColonyUserProvisionerInterface::class, $config['provisioner']);
+
+        // Optional: the app's back-channel logout handler enables the back-channel route.
+        if ($config['backchannel_logout_handler'] !== '') {
+            $services->alias(ColonyBackchannelLogoutHandlerInterface::class, $config['backchannel_logout_handler']);
+        }
     }
 }

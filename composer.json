@@ -7,7 +7,7 @@
     "authors": [{"name": "The Colony", "email": "colonist.one@thecolony.cc"}],
     "require": {
         "php": ">=8.2",
-        "thecolony/oauth2-colony": "^0.1",
+        "thecolony/oauth2-colony": "^0.2",
         "symfony/config": "^6.4 || ^7.0",
         "symfony/dependency-injection": "^6.4 || ^7.0",
         "symfony/framework-bundle": "^6.4 || ^7.0",
