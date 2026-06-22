@@ -25,6 +25,7 @@ use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
 use Symfony\Component\Security\Core\User\InMemoryUser;
 use Symfony\Component\Security\Core\User\UserInterface;
 use TheColony\ColonyLoginBundle\Controller\ColonyLoginController;
+use TheColony\ColonyLoginBundle\Security\ColonyBackchannelLogoutHandlerInterface;
 use TheColony\ColonyLoginBundle\Security\ColonyLoginState;
 use TheColony\ColonyLoginBundle\Security\ColonyUserProvisionerInterface;
 use TheColony\OAuth2\ColonyProvider;
@@ -38,6 +39,8 @@ final class ColonyLoginControllerTest extends TestCase
         'userinfo_endpoint' => 'https://thecolony.cc/oauth/userinfo',
         'jwks_uri' => 'https://thecolony.cc/.well-known/jwks.json',
     ];
+
+    private const BCL = 'http://schemas.openid.net/event/backchannel-logout';
 
     private Session $session;
     private TokenStorage $tokenStorage;
@@ -65,6 +68,7 @@ final class ColonyLoginControllerTest extends TestCase
         bool $enabled = true,
         string $defaultUri = '',
         ?UserInterface $provisioned = null,
+        ?ColonyBackchannelLogoutHandlerInterface $logoutHandler = null,
     ): ColonyLoginController {
         $this->session = new Session(new MockArraySessionStorage());
         $this->tokenStorage = new TokenStorage();
@@ -121,6 +125,7 @@ final class ColonyLoginControllerTest extends TestCase
             'app_login',
             'form_login',
             $defaultUri,
+            $logoutHandler,
         );
         $controller->setContainer($container);
 
@@ -238,5 +243,91 @@ final class ColonyLoginControllerTest extends TestCase
 
         $response = $controller->callback($request);
         self::assertSame('/app_login', $response->getTargetUrl());
+    }
+
+    // -- silent SSO ----------------------------------------------------------
+
+    #[Test]
+    public function silent_redirects_with_prompt_none(): void
+    {
+        $controller = $this->controller([$this->discovery()]);
+        $request = new Request();
+        $request->setSession($this->session);
+
+        $response = $controller->silent($request);
+        self::assertInstanceOf(RedirectResponse::class, $response);
+        parse_str((string) parse_url($response->getTargetUrl(), PHP_URL_QUERY), $q);
+        self::assertSame('none', $q['prompt']);
+        self::assertNotEmpty($this->session->get('colony_oidc_state'));
+    }
+
+    // -- back-channel logout -------------------------------------------------
+
+    private function logoutHandler(): ColonyBackchannelLogoutHandlerInterface
+    {
+        return new class implements ColonyBackchannelLogoutHandlerInterface {
+            /** @var array<string,mixed>|null */
+            public ?array $claims = null;
+
+            public function logout(array $claims): void
+            {
+                $this->claims = $claims;
+            }
+        };
+    }
+
+    #[Test]
+    public function backchannel_404s_when_no_handler_configured(): void
+    {
+        $controller = $this->controller([]);   // no logout handler
+        $this->expectException(NotFoundHttpException::class);
+        $controller->backchannelLogout(new Request());
+    }
+
+    #[Test]
+    public function backchannel_400s_on_missing_token(): void
+    {
+        $controller = $this->controller([], logoutHandler: $this->logoutHandler());
+        $response = $controller->backchannelLogout(new Request());
+        self::assertSame(400, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function backchannel_400s_on_invalid_token(): void
+    {
+        $kit = new OidcTestKit();
+        $other = new OidcTestKit();   // signs with a key NOT in the served JWKS
+        $handler = $this->logoutHandler();
+        $controller = $this->controller(
+            [$this->discovery(), new GuzzleResponse(200, [], $kit->jwksJson())],
+            logoutHandler: $handler,
+        );
+        $token = $other->idToken([
+            'iss' => 'https://thecolony.cc', 'aud' => 'client_abc', 'iat' => time(),
+            'sub' => 'agent_123', 'events' => [self::BCL => []],
+        ]);
+        $response = $controller->backchannelLogout(new Request([], ['logout_token' => $token]));
+        self::assertSame(400, $response->getStatusCode());
+        self::assertNull($handler->claims);   // handler never invoked on a bad token
+    }
+
+    #[Test]
+    public function backchannel_200_validates_and_invokes_handler(): void
+    {
+        $kit = new OidcTestKit();
+        $handler = $this->logoutHandler();
+        $controller = $this->controller(
+            [$this->discovery(), new GuzzleResponse(200, [], $kit->jwksJson())],
+            logoutHandler: $handler,
+        );
+        $token = $kit->idToken([
+            'iss' => 'https://thecolony.cc', 'aud' => 'client_abc', 'iat' => time(), 'exp' => time() + 120,
+            'sub' => 'agent_123', 'sid' => 'sess_1', 'events' => [self::BCL => []],
+        ]);
+        $response = $controller->backchannelLogout(new Request([], ['logout_token' => $token]));
+        self::assertSame(200, $response->getStatusCode());
+        self::assertNotNull($handler->claims);
+        self::assertSame('agent_123', $handler->claims['sub']);
+        self::assertSame('sess_1', $handler->claims['sid']);
     }
 }

@@ -11,6 +11,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use TheColony\ColonyLoginBundle\Security\ColonyBackchannelLogoutHandlerInterface;
 use TheColony\ColonyLoginBundle\Security\ColonyLoginState;
 use TheColony\ColonyLoginBundle\Security\ColonyUserProvisionerInterface;
 use TheColony\OAuth2\ColonyProvider;
@@ -35,11 +36,29 @@ final class ColonyLoginController extends AbstractController
         private readonly string $failureRoute,
         private readonly string $authenticatorName = '',
         private readonly string $defaultUri = '',
+        private readonly ?ColonyBackchannelLogoutHandlerInterface $logoutHandler = null,
     ) {
     }
 
     #[Route('/auth/colony', name: 'colony_login', methods: ['GET'])]
     public function start(Request $request): Response
+    {
+        return $this->beginAuthorization($request, silent: false);
+    }
+
+    /**
+     * Silent SSO (`prompt=none`): re-authenticate a user who already has a Colony
+     * session with no UI (typically loaded in a hidden iframe). On the callback,
+     * `?error=login_required` / `consent_required` just route to the failure route
+     * (your interactive login) — the right fallback.
+     */
+    #[Route('/auth/colony/silent', name: 'colony_login_silent', methods: ['GET'])]
+    public function silent(Request $request): Response
+    {
+        return $this->beginAuthorization($request, silent: true);
+    }
+
+    private function beginAuthorization(Request $request, bool $silent): Response
     {
         if (!$this->state->isEnabled()) {
             throw $this->createNotFoundException();
@@ -54,7 +73,10 @@ final class ColonyLoginController extends AbstractController
             return $this->redirectToRoute($this->successRoute);
         }
 
-        $url = $this->provider->getAuthorizationUrl(['redirect_uri' => $this->redirectUri($request)]);
+        $options = ['redirect_uri' => $this->redirectUri($request)];
+        $url = $silent
+            ? $this->provider->getSilentAuthorizationUrl($options)
+            : $this->provider->getAuthorizationUrl($options);
 
         $session = $request->getSession();
         $session->set('colony_oidc_state', $this->provider->getState());
@@ -110,6 +132,37 @@ final class ColonyLoginController extends AbstractController
         $this->security->login($user, $this->authenticatorName !== '' ? $this->authenticatorName : null);
 
         return $this->redirectToRoute($this->successRoute);
+    }
+
+    /**
+     * Back-channel logout endpoint (OIDC Back-Channel Logout 1.0). The Colony POSTs a
+     * signed `logout_token` here when a user signs out / their session is revoked, so the
+     * local session is ended server-side even if they never return. Active only when a
+     * {@see ColonyBackchannelLogoutHandlerInterface} is wired
+     * (`colony_login.backchannel_logout_handler`); otherwise 404.
+     *
+     * This is a server-to-server POST with no browser session — your firewall must allow
+     * it unauthenticated and it must be CSRF-exempt (it carries no cookies). Returns 200
+     * once the session is cleared, 400 on an invalid token (log nobody out).
+     */
+    #[Route('/auth/colony/backchannel-logout', name: 'colony_login_backchannel', methods: ['POST'])]
+    public function backchannelLogout(Request $request): Response
+    {
+        if (!$this->state->isEnabled() || $this->logoutHandler === null) {
+            throw $this->createNotFoundException();
+        }
+        $logoutToken = (string) $request->request->get('logout_token', '');
+        if ($logoutToken === '') {
+            return new Response('', Response::HTTP_BAD_REQUEST);
+        }
+        try {
+            $claims = $this->provider->validateLogoutToken($logoutToken);
+        } catch (ColonyOidcException) {
+            return new Response('', Response::HTTP_BAD_REQUEST);
+        }
+        $this->logoutHandler->logout($claims);
+
+        return new Response('', Response::HTTP_OK);
     }
 
     /**

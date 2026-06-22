@@ -67,6 +67,8 @@ colony_login:
     authenticator: form_login          # name passed to Security::login()
     cache:         cache.app           # PSR-6 pool; caches discovery + JWKS
     default_uri:   '%env(default::DEFAULT_URI)%'   # canonical origin (optional)
+    # optional — enables POST /auth/colony/backchannel-logout (see below):
+    backchannel_logout_handler: App\Security\ColonyLogoutHandler
     routes:
         success: app_dashboard
         failure: app_login
@@ -80,9 +82,49 @@ colony_login:
     type: attribute
 ```
 
-This registers `GET /auth/colony` (`colony_login`) and
-`GET /auth/colony/callback` (`colony_login_callback`). Register the Colony
+This registers `GET /auth/colony` (`colony_login`), `GET /auth/colony/callback`
+(`colony_login_callback`), `GET /auth/colony/silent` (`colony_login_silent`), and
+`POST /auth/colony/backchannel-logout` (`colony_login_backchannel`). Register the Colony
 client's redirect URI as `https://<your-app>/auth/colony/callback`.
+
+## Silent SSO (`prompt=none`)
+
+`GET /auth/colony/silent` starts a no-UI authorization (load it in a hidden iframe) to
+sign in a user who already has a Colony session. The callback is shared: on
+`?error=login_required` / `consent_required` it routes to your `failure` route — i.e. your
+interactive login — which is the correct fallback.
+
+## Back-channel logout
+
+To end the local session when a user signs out *at the Colony* (even if they never return
+to your app), implement `ColonyBackchannelLogoutHandlerInterface` and wire it via
+`backchannel_logout_handler`. That turns on `POST /auth/colony/backchannel-logout`, where
+the bundle validates the IdP's signed `logout_token` and hands you the claims to terminate
+sessions for:
+
+```php
+final class ColonyLogoutHandler implements ColonyBackchannelLogoutHandlerInterface
+{
+    public function logout(array $claims): void
+    {
+        // kill local sessions for $claims['sub'] (all of the user's sessions)
+        // and/or the single session $claims['sid']. Needs a session store you can
+        // query by subject/session id (e.g. a DB session handler with a colony_sub
+        // column) — native file sessions can't be looked up this way.
+    }
+}
+```
+
+The endpoint returns `200` once your handler runs, `400` on an invalid token (nobody is
+logged out), and `404` while no handler is configured. It's a **server-to-server POST with
+no browser session** — exempt the path from your firewall (allow anonymous) and from CSRF,
+e.g.:
+
+```yaml
+# config/packages/security.yaml — make the back-channel path public
+access_control:
+    - { path: ^/auth/colony/backchannel-logout$, roles: PUBLIC_ACCESS }
+```
 
 ## 3. Add the button
 
