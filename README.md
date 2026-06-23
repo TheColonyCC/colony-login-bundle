@@ -87,6 +87,30 @@ This registers `GET /auth/colony` (`colony_login`), `GET /auth/colony/callback`
 `POST /auth/colony/backchannel-logout` (`colony_login_backchannel`). Register the Colony
 client's redirect URI as `https://<your-app>/auth/colony/callback`.
 
+## `private_key_jwt` + PAR (optional)
+
+By default the bundle authenticates to the token endpoint with `client_secret`
+(`client_secret_post`). If your Colony client is registered for **`private_key_jwt`**
+(RFC 7523) you can drop the shared secret and authenticate with your own signing key
+instead — and optionally turn on **PAR** (RFC 9126) so the authorization request is pushed
+server-side:
+
+```yaml
+colony_login:
+    client_id: '%env(COLONY_CLIENT_ID)%'
+    token_endpoint_auth_method: private_key_jwt
+    private_key: '%env(COLONY_CLIENT_PRIVATE_KEY)%'   # PEM string, or a path to a PEM file
+    private_key_id: key-1                              # optional `kid`
+    signing_alg: RS256                                 # RS/PS/ES 256/384/512 (default RS256)
+    use_par: true                                      # optional: RFC 9126 PAR
+    provisioner: App\Security\ColonyUserProvisioner
+    # ... rest as above; client_secret is not needed for private_key_jwt
+```
+
+Register the matching **public** key with the Colony for this client. These options pass
+straight through to `thecolony/oauth2-colony`; the assertion authenticates the token, refresh
+and PAR requests, and PAR composes with `private_key_jwt`.
+
 ## Silent SSO (`prompt=none`)
 
 `GET /auth/colony/silent` starts a no-UI authorization (load it in a hidden iframe) to

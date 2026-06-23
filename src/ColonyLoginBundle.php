@@ -33,7 +33,12 @@ final class ColonyLoginBundle extends AbstractBundle
         $definition->rootNode()
             ->children()
                 ->scalarNode('client_id')->defaultValue('')->info('Colony OAuth client id (env placeholder is fine)')->end()
-                ->scalarNode('client_secret')->defaultValue('')->info('Colony OAuth client secret')->end()
+                ->scalarNode('client_secret')->defaultValue('')->info('Colony OAuth client secret (client_secret_post auth)')->end()
+                ->scalarNode('token_endpoint_auth_method')->defaultValue('client_secret_post')->info("Token-endpoint client auth: 'client_secret_post' (default) or 'private_key_jwt' (RFC 7523)")->end()
+                ->scalarNode('private_key')->defaultValue('')->info('For private_key_jwt: a PEM string or a path to a PEM file (the client signing key)')->end()
+                ->scalarNode('private_key_id')->defaultValue('')->info('For private_key_jwt: optional key id (kid)')->end()
+                ->scalarNode('signing_alg')->defaultValue('RS256')->info('For private_key_jwt: assertion signing algorithm — RS/PS/ES 256/384/512')->end()
+                ->booleanNode('use_par')->defaultValue(false)->info('Push the authorization request server-side (RFC 9126 PAR)')->end()
                 ->scalarNode('issuer')->defaultValue('https://thecolony.cc')->cannotBeEmpty()->end()
                 ->scalarNode('scope')->defaultValue('openid profile email')->cannotBeEmpty()->end()
                 ->scalarNode('default_uri')->defaultValue('')->info('Canonical app origin (e.g. https://app.example) — flow is pinned here so redirect_uri matches and the session survives')->end()
@@ -53,7 +58,9 @@ final class ColonyLoginBundle extends AbstractBundle
 
     /**
      * @param array{
-     *     client_id: string, client_secret: string, issuer: string, scope: string,
+     *     client_id: string, client_secret: string, token_endpoint_auth_method: string,
+     *     private_key: string, private_key_id: string, signing_alg: string, use_par: bool,
+     *     issuer: string, scope: string,
      *     default_uri: string, provisioner: string, cache: string, authenticator: string,
      *     backchannel_logout_handler: string,
      *     routes: array{success: string, failure: string}
@@ -76,7 +83,17 @@ final class ColonyLoginBundle extends AbstractBundle
             'clientSecret' => $config['client_secret'],
             'issuer' => $config['issuer'],
             'scope' => $config['scope'],
+            'tokenEndpointAuthMethod' => $config['token_endpoint_auth_method'],
+            'signingAlg' => $config['signing_alg'],
+            'usePar' => $config['use_par'],
         ];
+        // private_key_jwt: pass the signing key (and optional kid) through to the provider.
+        if ($config['private_key'] !== '') {
+            $providerOptions['privateKey'] = $config['private_key'];
+        }
+        if ($config['private_key_id'] !== '') {
+            $providerOptions['privateKeyId'] = $config['private_key_id'];
+        }
         if ($config['cache'] !== '') {
             $services->set('colony_login.psr16_cache', Psr16Cache::class)
                 ->args([service($config['cache'])]);
