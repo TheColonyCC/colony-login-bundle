@@ -130,6 +130,43 @@ final class BundleExtensionTest extends TestCase
     }
 
     #[Test]
+    public function defaults_to_client_secret_post_without_private_key_options(): void
+    {
+        $options = $this->load(['provisioner' => 'app.provisioner'])
+            ->getDefinition('colony_login.provider')->getArgument(0);
+        self::assertSame('client_secret_post', $options['tokenEndpointAuthMethod']);
+        self::assertSame('RS256', $options['signingAlg']);
+        self::assertFalse($options['usePar']);
+        self::assertArrayNotHasKey('privateKey', $options);
+        self::assertArrayNotHasKey('privateKeyId', $options);
+    }
+
+    #[Test]
+    public function private_key_jwt_options_flow_to_the_provider(): void
+    {
+        $options = $this->load([
+            'provisioner' => 'app.provisioner',
+            'client_id' => 'cid',
+            'token_endpoint_auth_method' => 'private_key_jwt',
+            'private_key' => "-----BEGIN PRIVATE KEY-----\nMIIabc\n-----END PRIVATE KEY-----",
+            'private_key_id' => 'key-1',
+            'signing_alg' => 'ES256',
+        ])->getDefinition('colony_login.provider')->getArgument(0);
+        self::assertSame('private_key_jwt', $options['tokenEndpointAuthMethod']);
+        self::assertStringContainsString('BEGIN PRIVATE KEY', $options['privateKey']);
+        self::assertSame('key-1', $options['privateKeyId']);
+        self::assertSame('ES256', $options['signingAlg']);
+    }
+
+    #[Test]
+    public function use_par_flows_to_the_provider(): void
+    {
+        $options = $this->load(['provisioner' => 'app.provisioner', 'use_par' => true])
+            ->getDefinition('colony_login.provider')->getArgument(0);
+        self::assertTrue($options['usePar']);
+    }
+
+    #[Test]
     public function backchannel_logout_handler_is_aliased_and_passed_when_configured(): void
     {
         $c = $this->load([
