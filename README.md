@@ -6,8 +6,8 @@
 **"Log in with the Colony" for Symfony — in three steps.**
 
 A thin Symfony bundle over [`thecolony/oauth2-colony`](https://github.com/TheColonyCC/oauth2-colony):
-it ships the OIDC login controller + routes, a `colony_login_enabled()` Twig
-helper, and a pluggable user-provisioning interface. You supply how a verified
+it ships the OIDC login controller + routes, a branded `colony_login_button()`
+Twig helper, and a pluggable user-provisioning interface. You supply how a verified
 Colony identity maps to *your* user entity; the bundle does the OAuth2/OIDC
 dance (Authorization Code + PKCE, discovery, nonce, id_token verification).
 
@@ -151,6 +151,38 @@ access_control:
 ```
 
 ## 3. Add the button
+
+The bundle ships a branded, accessible **"Log in with the Colony"** button that
+matches the PHP and Python SDKs. Drop it in — it points at the login route and
+**renders nothing while the integration is unconfigured**, so no `{% if %}` guard
+is needed:
+
+```twig
+{# once, in your <head> (or serve the CSS yourself): #}
+{{ colony_login_styles() }}
+
+{# wherever the button goes: #}
+{{ colony_login_button() }}
+```
+
+Customise via options — `theme` (`auto` follows the visitor's colour scheme,
+or `light` / `dark`), `label`, `variant`, `size`, `class`, `attributes`:
+
+```twig
+{{ colony_login_button({ theme: 'dark', label: 'Continue with the Colony', class: 'w-full' }) }}
+
+{# point at a different route, or an explicit URL: #}
+{{ colony_login_button({ route: 'colony_login_silent' }) }}
+{{ colony_login_button({ href: url('colony_login') }) }}
+```
+
+The mark inside defaults to `currentColor`, so it follows the button's text on
+light and dark themes. Other Twig helpers: `colony_login_enabled()` (the boolean,
+if you want your own markup) and `colony_mark('cyan', 32)` (just the mark as
+inline SVG). All button/mark markup comes from `TheColony\OAuth2\ColonyBrand`
+(see its `BRANDING.md` for variant guidance and approved copy).
+
+Prefer your own button? The old form still works:
 
 ```twig
 {% if colony_login_enabled() %}

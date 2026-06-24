@@ -126,7 +126,7 @@ final class ColonyLoginBundle extends AbstractBundle
             ]);
 
         $services->set('colony_login.twig_extension', ColonyLoginExtension::class)
-            ->args([service('colony_login.state')]);
+            ->args([service('colony_login.state'), service('router')]);
 
         // The app's provisioner, exposed under the interface the controller needs.
         $services->alias(ColonyUserProvisionerInterface::class, $config['provisioner']);

@@ -7,7 +7,7 @@
     "authors": [{"name": "The Colony", "email": "colonist.one@thecolony.cc"}],
     "require": {
         "php": ">=8.2",
-        "thecolony/oauth2-colony": "^0.2",
+        "thecolony/oauth2-colony": "^0.2.3",
         "symfony/config": "^6.4 || ^7.0",
         "symfony/dependency-injection": "^6.4 || ^7.0",
         "symfony/framework-bundle": "^6.4 || ^7.0",
@@ -24,7 +24,7 @@
         "twig/twig": "^3.0"
     },
     "suggest": {
-        "symfony/twig-bundle": "For the colony_login_enabled() Twig helper used to show the login button",
+        "symfony/twig-bundle": "For the colony_login_button()/colony_login_enabled() Twig helpers that render the login button",
         "symfony/cache": "For caching OIDC discovery + JWKS (pass a PSR-6 pool via colony_login.cache)"
     },
     "autoload": {"psr-4": {"TheColony\\ColonyLoginBundle\\": "src/"}},
