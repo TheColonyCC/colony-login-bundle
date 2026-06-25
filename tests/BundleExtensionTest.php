@@ -52,6 +52,17 @@ final class BundleExtensionTest extends TestCase
         // provisioner alias points at the app service
         $alias = $c->getAlias(ColonyUserProvisionerInterface::class);
         self::assertSame('app.provisioner', (string) $alias);
+
+        // require_acr is absent from provider options unless configured
+        self::assertArrayNotHasKey('requireAcr', $options, 'no requireAcr by default');
+    }
+
+    #[Test]
+    public function require_acr_is_threaded_when_set(): void
+    {
+        $options = $this->load(['provisioner' => 'app.provisioner', 'require_acr' => 'mfa'])
+            ->getDefinition('colony_login.provider')->getArgument(0);
+        self::assertSame('mfa', $options['requireAcr']);
     }
 
     #[Test]

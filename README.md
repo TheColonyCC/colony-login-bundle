@@ -111,6 +111,23 @@ Register the matching **public** key with the Colony for this client. These opti
 straight through to `thecolony/oauth2-colony`; the assertion authenticates the token, refresh
 and PAR requests, and PAR composes with `private_key_jwt`.
 
+## Require 2FA (`require_acr`, optional)
+
+To force a step-up / MFA login, set `require_acr` (e.g. `mfa`). The bundle sends
+`acr_values` on the authorization request so the IdP enforces the context up front, then
+re-checks the returned `id_token`'s `acr`/`amr`:
+
+```yaml
+colony_login:
+    client_id: '%env(COLONY_CLIENT_ID)%'
+    require_acr: mfa                                    # IdP must assert this acr, else the login is rejected
+    provisioner: App\Security\ColonyUserProvisioner
+    # ... rest as above
+```
+
+Passes straight through to `thecolony/oauth2-colony` (>= 0.2.4). The Python counterpart is
+`require_acr="mfa"` in [`colony-oidc`](https://pypi.org/project/colony-oidc/).
+
 ## Silent SSO (`prompt=none`)
 
 `GET /auth/colony/silent` starts a no-UI authorization (load it in a hidden iframe) to
