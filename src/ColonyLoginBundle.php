@@ -39,6 +39,7 @@ final class ColonyLoginBundle extends AbstractBundle
                 ->scalarNode('private_key_id')->defaultValue('')->info('For private_key_jwt: optional key id (kid)')->end()
                 ->scalarNode('signing_alg')->defaultValue('RS256')->info('For private_key_jwt: assertion signing algorithm — RS/PS/ES 256/384/512')->end()
                 ->booleanNode('use_par')->defaultValue(false)->info('Push the authorization request server-side (RFC 9126 PAR)')->end()
+                ->scalarNode('require_acr')->defaultValue('')->info("Require an authentication context (e.g. 'mfa'): sends acr_values up front for IdP step-up and re-checks the returned id_token acr/amr. Needs oauth2-colony >=0.2.4.")->end()
                 ->scalarNode('issuer')->defaultValue('https://thecolony.cc')->cannotBeEmpty()->end()
                 ->scalarNode('scope')->defaultValue('openid profile email')->cannotBeEmpty()->end()
                 ->scalarNode('default_uri')->defaultValue('')->info('Canonical app origin (e.g. https://app.example) — flow is pinned here so redirect_uri matches and the session survives')->end()
@@ -60,6 +61,7 @@ final class ColonyLoginBundle extends AbstractBundle
      * @param array{
      *     client_id: string, client_secret: string, token_endpoint_auth_method: string,
      *     private_key: string, private_key_id: string, signing_alg: string, use_par: bool,
+     *     require_acr: string,
      *     issuer: string, scope: string,
      *     default_uri: string, provisioner: string, cache: string, authenticator: string,
      *     backchannel_logout_handler: string,
@@ -87,6 +89,10 @@ final class ColonyLoginBundle extends AbstractBundle
             'signingAlg' => $config['signing_alg'],
             'usePar' => $config['use_par'],
         ];
+        // require_acr: MFA step-up — send acr_values up front + re-check the id_token acr/amr.
+        if ($config['require_acr'] !== '') {
+            $providerOptions['requireAcr'] = $config['require_acr'];
+        }
         // private_key_jwt: pass the signing key (and optional kid) through to the provider.
         if ($config['private_key'] !== '') {
             $providerOptions['privateKey'] = $config['private_key'];
